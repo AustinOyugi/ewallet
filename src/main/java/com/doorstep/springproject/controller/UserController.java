@@ -1,5 +1,7 @@
 package com.doorstep.springproject.controller;
 
+import com.doorstep.springproject.payloads.userdata.UpdatePassword;
+import com.doorstep.springproject.payloads.userdata.UserSummary;
 import com.doorstep.springproject.services.users.UserService;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
@@ -42,9 +44,24 @@ public class UserController {
         return userService.checkEmailAvailability(email);
     }
 
-    @GetMapping("/user/{username}")
+    @GetMapping("/{username}")
     @ApiOperation(value = "Get User Profile by username")
     public ResponseEntity<?> getUserProfile(@PathVariable(value = "username") String username) {
         return userService.getUserProfile(username);
+    }
+
+    @PostMapping("updateprofil/{userid}")
+    @ApiOperation("Update User Profile")
+    public ResponseEntity<?> updateUserProfile(@ApiParam("Profile Object") UserSummary userSummary,
+                                               @PathVariable("userid") String userid){
+        return userService.updateUserProfile(userSummary,userid);
+    }
+
+    @PostMapping("updatepassword/{userid}")
+    @ApiOperation("Update User Password")
+    public ResponseEntity<?> updateUserPassword(
+            @ApiParam("UpdatePassword Object") @RequestBody UpdatePassword updatePasswordObject
+            , @PathVariable("userid") String userId){
+        return userService.updateUserPassword(updatePasswordObject,userId);
     }
 }
