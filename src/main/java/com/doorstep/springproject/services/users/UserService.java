@@ -2,15 +2,21 @@ package com.doorstep.springproject.services.users;
 
 import com.doorstep.springproject.exceptions.ResourceNotFoundException;
 import com.doorstep.springproject.models.userdata.User;
+import com.doorstep.springproject.payloads.system.ApiResponse;
+import com.doorstep.springproject.payloads.userdata.UpdatePassword;
 import com.doorstep.springproject.payloads.userdata.UserSummary;
 import com.doorstep.springproject.repositories.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import javax.transaction.Transactional;
+import java.security.SecureRandom;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -23,10 +29,12 @@ import java.util.Optional;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
     @Autowired
-    public UserService(UserRepository userRepository) {
+    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     public ResponseEntity<?> getCurrentUser(String userId) {
@@ -91,5 +99,67 @@ public class UserService {
 
     public Optional<User> findByEmailAddress(String email) {
         return userRepository.findByEmailAddress(email);
+    }
+
+    public ResponseEntity<?> updateUserProfile(UserSummary userSummary, String userid) {
+
+        User optionalUser = getUser(userid);
+
+        if (Objects.isNull(optionalUser)){
+            throw new ResourceNotFoundException("User","UserId",userid);
+        }
+
+        if (!optionalUser.getUserName().equals(userSummary.getUserName())){
+
+            if(userRepository.existsByUserName(userSummary.getUserName())){
+                return ResponseEntity.badRequest()
+                        .body(new ApiResponse(false,"Username Already Exists"));
+            }
+
+            optionalUser.setUserName(userSummary.getUserName());
+        }
+
+        if (!optionalUser.getEmailAddress().equals(userSummary.getEmailAddress())){
+
+            if(userRepository.existsByEmailAddress(userSummary.getEmailAddress())){
+                return ResponseEntity.badRequest()
+                        .body(new ApiResponse(false,"Email Address Already Exists"));
+            }
+
+            optionalUser.setEmailAddress(userSummary.getEmailAddress());
+        }
+
+        optionalUser.setFullName(userSummary.getFullName());
+        optionalUser.setMobileNumber(userSummary.getMobileNumber());
+        optionalUser.setCountry(userSummary.getCountry());
+
+        return ResponseEntity.ok(saveUser(optionalUser));
+    }
+
+    public ResponseEntity<?> updateUserPassword(UpdatePassword updatePasswordObject, String userId) {
+
+        User optionalUser = getUser(userId);
+
+        if (Objects.isNull(optionalUser)){
+            throw new ResourceNotFoundException("User","UserId",userId);
+        }
+
+        int strength = 10; // work factor of bcrypt
+
+        PasswordEncoder bCryptPasswordEncoder =
+                new BCryptPasswordEncoder(strength, new SecureRandom());
+
+        if (bCryptPasswordEncoder.matches(updatePasswordObject.getOldPassword(),optionalUser.getPassword())){
+
+            String encodedPassword = bCryptPasswordEncoder.encode(updatePasswordObject.getNewPassword());
+
+            optionalUser.setPassword(encodedPassword);
+            saveUser(optionalUser);
+
+        }else
+            return ResponseEntity.badRequest().body(new ApiResponse(false,"Old Password Is Incorrect"));
+
+
+        return ResponseEntity.ok(new ApiResponse(true,"Password Changed Successfully"));
     }
 }
